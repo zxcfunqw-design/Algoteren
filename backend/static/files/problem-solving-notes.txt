@@ -1,0 +1,5 @@
+1. Read constraints first.
+2. Start with a brute force sketch.
+3. Test on the sample.
+4. Clean the implementation.
+

@@ -1,0 +1,12 @@
+backend/.venv/
+backend/__pycache__/
+backend/**/*.pyc
+backend/alembic/versions/__pycache__/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+**/.DS_Store
+

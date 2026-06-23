@@ -1,0 +1,27 @@
+"""${message}
+
+Revision ID: ${up_revision}
+Revises: ${down_revision | comma,n}
+Create Date: ${create_date}
+"""
+from alembic import op
+import sqlalchemy as sa
+
+from app.database import Base
+
+
+revision = ${repr(up_revision)}
+down_revision = ${repr(down_revision)}
+branch_labels = ${repr(branch_labels)}
+depends_on = ${repr(depends_on)}
+
+
+def upgrade() -> None:
+    bind = op.get_bind()
+    Base.metadata.create_all(bind=bind)
+
+
+def downgrade() -> None:
+    bind = op.get_bind()
+    Base.metadata.drop_all(bind=bind)
+
