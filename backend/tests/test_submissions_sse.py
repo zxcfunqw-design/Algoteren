@@ -13,9 +13,11 @@ def test_submission_completes_and_pushes_sse(client_factory):
     client, _ = client_factory(runner=runner)
 
     client.post("/api/auth/login", json={"email": "student@algoteren.dev", "password": "Student123!"})
+    headers = {"x-csrf-token": client.cookies.get("algoteren_csrf_token")}
 
     create = client.post(
         "/api/submissions",
+        headers=headers,
         json={
             "problem_slug": "sum-two-numbers",
             "language": "cpp",

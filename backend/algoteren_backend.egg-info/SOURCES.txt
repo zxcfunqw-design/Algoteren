@@ -15,4 +15,6 @@ app/settings.py
 tests/test_admin_crud.py
 tests/test_auth_and_seed.py
 tests/test_judge_service.py
+tests/test_runner_selection_and_local_judge.py
 tests/test_submissions_sse.py
+tests/test_supabase_polygon_security.py

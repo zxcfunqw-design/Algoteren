@@ -21,6 +21,8 @@ def app_factory(tmp_path: Path):
             secret_key="test-secret-key-with-32-bytes-minimum!",
             frontend_origin="http://testserver",
             seed_demo_data=seed_demo_data,
+            auto_create_schema=True,
+            cookie_secure=False,
         )
         return create_app(settings=settings, judge_runner=runner or ScriptedJudgeRunner(), seed_demo_data=seed_demo_data)
 

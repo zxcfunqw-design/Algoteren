@@ -30,7 +30,9 @@ from .models import (
 from .security import hash_password
 
 
-def json_loads_list(raw: str | None) -> list[str]:
+def json_loads_list(raw) -> list[str]:
+    if isinstance(raw, list):
+        return [str(item) for item in raw]
     if not raw:
         return []
     try:
@@ -40,8 +42,8 @@ def json_loads_list(raw: str | None) -> list[str]:
     return value if isinstance(value, list) else []
 
 
-def json_dumps_list(values: list[str]) -> str:
-    return json.dumps(values, ensure_ascii=False)
+def json_dumps_list(values: list[str]) -> list[str]:
+    return [str(value) for value in values]
 
 
 def normalize_output(text: str) -> str:
@@ -75,8 +77,10 @@ class JudgeRunner(Protocol):
 
 
 class DockerJudgeRunner:
-    def __init__(self, *, image: str = "gcc:13") -> None:
+    def __init__(self, *, image: str = "gcc:13", compile_timeout_seconds: int = 30, max_output_bytes: int = 16_384) -> None:
         self.image = image
+        self.compile_timeout_seconds = compile_timeout_seconds
+        self.max_output_bytes = max_output_bytes
 
     def _docker_base(self, workspace: Path) -> list[str]:
         return [
@@ -86,7 +90,7 @@ class DockerJudgeRunner:
             "--network",
             "none",
             "--memory",
-            "256m",
+            "512m",
             "--cpus",
             "1",
             "--pids-limit",
@@ -113,14 +117,20 @@ class DockerJudgeRunner:
             "main.cpp",
         ]
         try:
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self.compile_timeout_seconds,
+                check=False,
+            )
         except FileNotFoundError as exc:
             return CompilationResult(ok=False, stderr="Docker CLI is not available")
         except subprocess.TimeoutExpired:
             return CompilationResult(ok=False, stderr="Compilation timed out")
 
         if completed.returncode != 0:
-            return CompilationResult(ok=False, stderr=completed.stderr or "Compilation failed")
+            return CompilationResult(ok=False, stderr=(completed.stderr or "Compilation failed")[: self.max_output_bytes])
         return CompilationResult(ok=True, artifact_ref=str(workspace))
 
     def run(self, artifact_ref: str, input_data: str, *, time_limit_ms: int, memory_limit_mb: int) -> ExecutionResult:
@@ -160,13 +170,19 @@ class DockerJudgeRunner:
             return ExecutionResult(status="runtime_error", stderr="Docker CLI is not available")
 
         if completed.returncode != 0:
-            return ExecutionResult(status="runtime_error", stdout=completed.stdout, stderr=completed.stderr)
-        return ExecutionResult(status="ok", stdout=completed.stdout, runtime_ms=int(timeout_seconds * 1000 * 0.6))
+            return ExecutionResult(
+                status="runtime_error",
+                stdout=completed.stdout[: self.max_output_bytes],
+                stderr=completed.stderr[: self.max_output_bytes],
+            )
+        return ExecutionResult(status="ok", stdout=completed.stdout[: self.max_output_bytes], runtime_ms=int(timeout_seconds * 1000 * 0.6))
 
 
 class LocalCppJudgeRunner:
-    def __init__(self, *, compiler: str = "g++") -> None:
+    def __init__(self, *, compiler: str = "g++", compile_timeout_seconds: int = 30, max_output_bytes: int = 16_384) -> None:
         self.compiler = compiler
+        self.compile_timeout_seconds = compile_timeout_seconds
+        self.max_output_bytes = max_output_bytes
 
     def compile(self, source_code: str, workspace: Path) -> CompilationResult:
         workspace.mkdir(parents=True, exist_ok=True)
@@ -188,7 +204,7 @@ class LocalCppJudgeRunner:
                 cwd=workspace,
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=self.compile_timeout_seconds,
                 check=False,
             )
         except FileNotFoundError:
@@ -197,7 +213,7 @@ class LocalCppJudgeRunner:
             return CompilationResult(ok=False, stderr="Compilation timed out")
 
         if completed.returncode != 0:
-            return CompilationResult(ok=False, stderr=completed.stderr or "Compilation failed")
+            return CompilationResult(ok=False, stderr=(completed.stderr or "Compilation failed")[: self.max_output_bytes])
         return CompilationResult(ok=True, artifact_ref=str(workspace))
 
     def run(self, artifact_ref: str, input_data: str, *, time_limit_ms: int, memory_limit_mb: int) -> ExecutionResult:
@@ -223,8 +239,23 @@ class LocalCppJudgeRunner:
             return ExecutionResult(status="runtime_error", stderr=f"{binary_name} is not available")
 
         if completed.returncode != 0:
-            return ExecutionResult(status="runtime_error", stdout=completed.stdout, stderr=completed.stderr)
-        return ExecutionResult(status="ok", stdout=completed.stdout, runtime_ms=elapsed_ms)
+            return ExecutionResult(
+                status="runtime_error",
+                stdout=completed.stdout[: self.max_output_bytes],
+                stderr=completed.stderr[: self.max_output_bytes],
+            )
+        return ExecutionResult(status="ok", stdout=completed.stdout[: self.max_output_bytes], runtime_ms=elapsed_ms)
+
+
+class UnavailableJudgeRunner:
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+    def compile(self, source_code: str, workspace: Path) -> CompilationResult:
+        return CompilationResult(ok=False, stderr=self.message)
+
+    def run(self, artifact_ref: str, input_data: str, *, time_limit_ms: int, memory_limit_mb: int) -> ExecutionResult:
+        return ExecutionResult(status="runtime_error", stderr=self.message)
 
 
 class ScriptedJudgeRunner:
@@ -424,9 +455,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             summary="A practical path from I/O basics to clean implementation habits.",
             track="cpp",
             level="starter",
-            steps_json=json.dumps(
-                ["Fast I/O", "Arrays and loops", "Functions", "Sorting", "Prefix sums", "Binary search", "Greedy thinking"]
-            ),
+            steps_json=["Fast I/O", "Arrays and loops", "Functions", "Sorting", "Prefix sums", "Binary search", "Greedy thinking"],
         ),
         Roadmap(
             slug="data-structures",
@@ -434,7 +463,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             summary="Study the structures that keep contest solutions fast and tidy.",
             track="core",
             level="intermediate",
-            steps_json=json.dumps(["Stacks", "Queues", "Deques", "Hash maps", "Priority queues", "Segment tree basics"]),
+            steps_json=["Stacks", "Queues", "Deques", "Hash maps", "Priority queues", "Segment tree basics"],
         ),
         Roadmap(
             slug="graph-theory",
@@ -442,7 +471,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             summary="A route through traversal, components, shortest paths, and directed acyclic graphs.",
             track="graphs",
             level="intermediate",
-            steps_json=json.dumps(["DFS", "BFS", "Connected components", "Toposort", "Shortest paths", "MST"]),
+            steps_json=["DFS", "BFS", "Connected components", "Toposort", "Shortest paths", "MST"],
         ),
     ]
     session.add_all(roadmaps)
@@ -454,7 +483,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             title="Sum Two Numbers",
             statement="Read two integers and output their sum.",
             difficulty="easy",
-            tags_json=json.dumps(["math", "implementation"]),
+            tags_json=["math", "implementation"],
             time_limit_ms=1000,
             memory_limit_mb=256,
             sample_input="2 5\n",
@@ -467,7 +496,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             title="Maximum of Three",
             statement="Read three integers and print the largest one.",
             difficulty="easy",
-            tags_json=json.dumps(["implementation", "conditionals"]),
+            tags_json=["implementation", "conditionals"],
             time_limit_ms=1000,
             memory_limit_mb=256,
             sample_input="8 3 5\n",
@@ -480,7 +509,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             title="Prefix Sum Window",
             statement="Read an array and report the largest sum of any window of length k.",
             difficulty="medium",
-            tags_json=json.dumps(["prefix-sum", "two-pointers"]),
+            tags_json=["prefix-sum", "two-pointers"],
             time_limit_ms=1000,
             memory_limit_mb=256,
             sample_input="5 2\n1 2 3 4 5\n",
@@ -585,7 +614,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             status="live",
             starts_at=datetime.now(timezone.utc),
             ends_at=datetime.now(timezone.utc),
-            problem_slugs_json=json.dumps(["sum-two-numbers", "max-of-three", "prefix-sum-window"]),
+            problem_slugs_json=["sum-two-numbers", "max-of-three", "prefix-sum-window"],
         ),
         Contest(
             slug="weekly-2",
@@ -594,7 +623,7 @@ def seed_mock_data(session: Session, static_files_dir: Path) -> None:
             status="scheduled",
             starts_at=None,
             ends_at=None,
-            problem_slugs_json=json.dumps(["sum-two-numbers", "prefix-sum-window"]),
+            problem_slugs_json=["sum-two-numbers", "prefix-sum-window"],
         ),
     ]
     session.add_all(contests)

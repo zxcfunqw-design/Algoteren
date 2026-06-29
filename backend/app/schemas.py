@@ -262,6 +262,18 @@ class AdminSummaryOut(BaseModel):
     contests: list[ContestOut]
 
 
+class PolygonProblemImportRequest(BaseModel):
+    polygon_id: int = Field(gt=0)
+    collection: str = Field(default="polygon", pattern=r"^[a-z0-9-]+$")
+    statement_language: str = "english"
+    difficulty: Literal["easy", "medium", "hard"] = "medium"
+
+
+class PolygonSyncResponse(BaseModel):
+    problem: ProblemDetailOut
+    imported_tests: int
+
+
 class JudgeTestResultData(BaseModel):
     order_index: int
     input_data: str

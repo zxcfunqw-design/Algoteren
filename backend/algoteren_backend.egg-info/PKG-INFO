@@ -13,5 +13,7 @@ Requires-Dist: PyJWT>=2.9
 Requires-Dist: passlib[bcrypt]>=1.7
 Requires-Dist: email-validator>=2.2
 Requires-Dist: python-multipart>=0.0.12
+Requires-Dist: httpx2>=0.27
+Requires-Dist: psycopg[binary]>=3.2
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3; extra == "dev"

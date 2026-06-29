@@ -7,17 +7,35 @@ from sqlalchemy import select
 
 from app.main import create_app
 from app.models import Problem, Submission, User
-from app.services import LocalCppJudgeRunner
+from app.services import LocalCppJudgeRunner, UnavailableJudgeRunner
 from app.settings import Settings
 
 
-def test_create_app_uses_local_runner_when_docker_is_missing(monkeypatch, tmp_path):
+def test_create_app_requires_docker_by_default_when_docker_is_missing(monkeypatch, tmp_path):
     monkeypatch.setattr("app.main.shutil.which", lambda name: None)
     settings = Settings(
         database_url=f"sqlite:///{tmp_path / 'fallback.sqlite3'}",
         secret_key="test-secret-key-with-32-bytes-minimum!",
         frontend_origin="http://testserver",
         seed_demo_data=False,
+        auto_create_schema=True,
+        cookie_secure=False,
+    )
+    app = create_app(settings=settings, seed_demo_data=False)
+
+    assert isinstance(app.state.judge_service.runner, UnavailableJudgeRunner)
+
+
+def test_create_app_uses_local_runner_only_when_explicitly_allowed(monkeypatch, tmp_path):
+    monkeypatch.setattr("app.main.shutil.which", lambda name: None)
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'fallback.sqlite3'}",
+        secret_key="test-secret-key-with-32-bytes-minimum!",
+        frontend_origin="http://testserver",
+        seed_demo_data=False,
+        auto_create_schema=True,
+        cookie_secure=False,
+        allow_local_judge=True,
     )
     app = create_app(settings=settings, seed_demo_data=False)
 

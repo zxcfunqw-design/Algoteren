@@ -31,7 +31,7 @@ def test_seeded_content_and_auth_flow(client_factory):
     forbidden = client.get("/api/admin/summary")
     assert forbidden.status_code == 403
 
-    client.post("/api/auth/logout")
+    client.post("/api/auth/logout", headers={"x-csrf-token": client.cookies.get("algoteren_csrf_token")})
 
     login = client.post(
         "/api/auth/login",
@@ -45,4 +45,3 @@ def test_seeded_content_and_auth_flow(client_factory):
     summary = admin_summary.json()
     assert len(summary["problems"]) >= 1
     assert len(summary["tutorials"]) >= 1
-

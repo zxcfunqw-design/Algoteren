@@ -5,9 +5,11 @@ def test_admin_can_create_content(client_factory):
     client, _ = client_factory()
 
     client.post("/api/auth/login", json={"email": "admin@algoteren.dev", "password": "Admin123!"})
+    headers = {"x-csrf-token": client.cookies.get("algoteren_csrf_token")}
 
     problem = client.post(
         "/api/admin/problems",
+        headers=headers,
         json={
             "slug": "pair-sum",
             "collection": "classics",
@@ -30,6 +32,7 @@ def test_admin_can_create_content(client_factory):
 
     tutorial = client.post(
         "/api/admin/tutorials",
+        headers=headers,
         json={
             "slug": "pair-sum-note",
             "title": "Pair Sum Note",
@@ -45,6 +48,7 @@ def test_admin_can_create_content(client_factory):
 
     file_resource = client.post(
         "/api/admin/files",
+        headers=headers,
         json={
             "slug": "pair-sum-template",
             "title": "Pair Sum Template",
@@ -59,6 +63,7 @@ def test_admin_can_create_content(client_factory):
 
     contest = client.post(
         "/api/admin/contests",
+        headers=headers,
         json={
             "slug": "spring-open",
             "title": "Spring Open",
@@ -78,4 +83,3 @@ def test_admin_can_create_content(client_factory):
 
     files = client.get("/api/files").json()
     assert any(item["slug"] == "pair-sum-template" for item in files)
-

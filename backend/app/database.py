@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from .settings import Settings, get_settings
 
@@ -19,6 +19,8 @@ def build_engine(settings: Settings):
         connect_args["check_same_thread"] = False
         if settings.database_url in {"sqlite://", "sqlite:///:memory:"}:
             engine_kwargs["poolclass"] = StaticPool
+    else:
+        engine_kwargs["poolclass"] = NullPool
 
     return create_engine(settings.database_url, connect_args=connect_args, **engine_kwargs)
 
@@ -36,4 +38,3 @@ def get_db(session_factory) -> Iterator[Session]:
         yield db
     finally:
         db.close()
-

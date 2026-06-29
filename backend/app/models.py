@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -10,6 +11,9 @@ from .database import Base
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+json_list_type = JSON().with_variant(JSONB, "postgresql")
 
 
 class User(Base):
@@ -33,7 +37,7 @@ class Roadmap(Base):
     summary: Mapped[str] = mapped_column(Text)
     track: Mapped[str] = mapped_column(String(128))
     level: Mapped[str] = mapped_column(String(32))
-    steps_json: Mapped[str] = mapped_column(Text)
+    steps_json: Mapped[list[str]] = mapped_column(json_list_type, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
@@ -46,7 +50,7 @@ class Problem(Base):
     title: Mapped[str] = mapped_column(String(255))
     statement: Mapped[str] = mapped_column(Text)
     difficulty: Mapped[str] = mapped_column(String(32), index=True)
-    tags_json: Mapped[str] = mapped_column(Text, default="[]")
+    tags_json: Mapped[list[str]] = mapped_column(json_list_type, default=list)
     time_limit_ms: Mapped[int] = mapped_column(Integer, default=1000)
     memory_limit_mb: Mapped[int] = mapped_column(Integer, default=256)
     sample_input: Mapped[str] = mapped_column(Text, default="")
@@ -112,7 +116,7 @@ class Contest(Base):
     status: Mapped[str] = mapped_column(String(32), default="scheduled")
     starts_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    problem_slugs_json: Mapped[str] = mapped_column(Text, default="[]")
+    problem_slugs_json: Mapped[list[str]] = mapped_column(json_list_type, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
     problems: Mapped[list[Problem]] = relationship(back_populates="contest")
@@ -169,4 +173,3 @@ class SubmissionTestResult(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
 
     submission: Mapped[Submission] = relationship(back_populates="test_results")
-
